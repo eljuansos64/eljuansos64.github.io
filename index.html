@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GitFlix</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #0d1117;
+      color: white;
+    }
+
+    header {
+      background-color: #161b22;
+      padding: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    h1 {
+      font-size: 2rem;
+      color: #00ffff;
+      cursor: pointer;
+    }
+
+    .search-input {
+      padding: 0.5rem;
+      border-radius: 5px;
+      border: none;
+      color: black;
+      background-color: white;
+    }
+
+    .series-list, .season-scene, .episode-scene {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1rem;
+      padding: 1rem;
+    }
+
+    .card {
+      background-color: #21262d;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .card:hover {
+      transform: scale(1.05);
+    }
+
+    .card img {
+      width: 100%;
+      height: 250px;
+      object-fit: cover;
+    }
+
+    .card-title {
+      text-align: center;
+      padding: 0.5rem;
+      color: #00d1b2;
+      font-weight: bold;
+    }
+
+    .back-btn {
+      background-color: #f39c12;
+      color: black;
+      border: none;
+      margin: 1rem;
+      padding: 0.5rem 1rem;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .player {
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    iframe {
+      width: 1065px;
+      height: 600px;
+      border: none;
+      border-radius: 8px;
+    }
+
+    .comments-section {
+      padding: 1rem;
+      max-width: 720px;
+      margin: auto;
+    }
+
+    .comment {
+      border-bottom: 1px solid #444;
+      padding: 0.5rem 0;
+    }
+
+    .comment img {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      vertical-align: middle;
+      margin-right: 0.5rem;
+    }
+
+    .comment-user {
+      font-weight: bold;
+      color: #00d1b2;
+    }
+
+    .comment-date {
+      font-size: 0.8rem;
+      color: #aaa;
+      margin-left: 0.5rem;
+    }
+
+    .comment-form {
+      display: flex;
+      flex-direction: column;
+      margin-top: 1rem;
+    }
+
+    .comment-form textarea {
+      padding: 0.5rem;
+      border-radius: 5px;
+      border: none;
+      resize: vertical;
+    }
+
+    .comment-form button {
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      border: none;
+      border-radius: 5px;
+      background-color: #00d1b2;
+      color: black;
+      cursor: pointer;
+    }
+
+    footer {
+      background-color: #161b22;
+      text-align: center;
+      padding: 1rem;
+      margin-top: 2rem;
+    }
+
+    footer a {
+      color: #00d1b2;
+      margin: 0 1rem;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 onclick="location.reload()">GitFlix</h1>
+    <input class="search-input" placeholder="Buscar..." />
+  </header>
+
+  <main>
+    <div class="series-list" id="series-list">
+      <div class="card" onclick="showSeasons('OK K.O')">
+        <img src="imagenes/okko.jpg" alt="OK K.O"/>
+        <div class="card-title">OK K.O</div>
+      </div>
+    </div>
+
+    <button class="back-btn" id="back-btn" onclick="goBack()" style="display: none;">Volver</button>
+
+    <div class="season-scene" id="season-list" style="display: none;"></div>
+    <div class="episode-scene" id="episode-list" style="display: none;"></div>
+
+    <div class="player" id="player" style="display: none;">
+      <iframe id="video-frame" allowfullscreen allow="autoplay"></iframe>
+    </div>
+
+    <div class="comments-section" id="comments" style="display: none;">
+      <h3>Comentarios (<span id="comment-count">0</span>)</h3>
+      <div id="comment-list"></div>
+      <form class="comment-form" onsubmit="addComment(event)">
+        <textarea id="comment-text" rows="3" placeholder="Escribe un comentario..."></textarea>
+        <button type="submit">Publicar</button>
+      </form>
+    </div>
+  </main>
+
+  <footer>
+    <a href="https://github.com/" target="_blank">GitHub</a>
+    <a href="https://instagram.com/" target="_blank">Instagram</a>
+    <a href="https://facebook.com/" target="_blank">Facebook</a>
+  </footer>
+
+  <script>
+    let historyStack = [];
+    const commentsMap = new Map();
+
+    const data = {
+      "OK K.O": {
+        "Temporada 1": [
+          { titulo: "Episodio 1", id: "1hVFb9-vhI1syAMdltuYvXKSwlt1hIZOl", drive: true },
+          { titulo: "Episodio 2", id: "t63t6ycc", drive: false }
+        ]
+      }
+    };
+
+    let currentEpisodeId = null;
+
+    function goBack() {
+      const previous = historyStack.pop();
+      if (!previous) return;
+      document.getElementById("series-list").style.display = previous === 'series' ? 'grid' : 'none';
+      document.getElementById("season-list").style.display = previous === 'season' ? 'grid' : 'none';
+      document.getElementById("episode-list").style.display = previous === 'episode' ? 'grid' : 'none';
+      document.getElementById("player").style.display = 'none';
+      document.getElementById("comments").style.display = 'none';
+      document.getElementById("back-btn").style.display = historyStack.length > 0 ? 'inline-block' : 'none';
+    }
+
+    function showSeasons(serie) {
+      historyStack.push('series');
+      document.getElementById("series-list").style.display = "none";
+      document.getElementById("season-list").innerHTML = "";
+      document.getElementById("season-list").style.display = "grid";
+      document.getElementById("episode-list").style.display = "none";
+      document.getElementById("player").style.display = "none";
+      document.getElementById("comments").style.display = "none";
+      document.getElementById("back-btn").style.display = "inline-block";
+      for (const temporada in data[serie]) {
+        const div = document.createElement("div");
+        div.className = "card";
+        div.innerHTML = `<div class='card-title'>${temporada}</div>`;
+        div.onclick = () => showEpisodes(serie, temporada);
+        document.getElementById("season-list").appendChild(div);
+      }
+    }
+
+    function showEpisodes(serie, temporada) {
+      historyStack.push('season');
+      document.getElementById("season-list").style.display = "none";
+      const container = document.getElementById("episode-list");
+      container.innerHTML = "";
+      container.style.display = "grid";
+      const episodes = data[serie][temporada];
+      episodes.forEach(ep => {
+        const div = document.createElement("div");
+        div.className = "card";
+        div.innerHTML = `<div class='card-title'>${ep.titulo}</div>`;
+        div.onclick = () => playEpisode(ep);
+        container.appendChild(div);
+      });
+    }
+
+    function playEpisode(ep) {
+      currentEpisodeId = ep;
+      historyStack.push('episode');
+      document.getElementById("episode-list").style.display = "none";
+      const player = document.getElementById("player");
+      const frame = document.getElementById("video-frame");
+      frame.src = ep.drive ? `https://drive.google.com/file/d/${ep.id}/preview?autoplay=1` : `https://sendvid.com/embed/${ep.id}`;
+      player.style.display = "flex";
+      document.getElementById("comments").style.display = "block";
+      renderComments();
+    }
+
+    function addComment(event) {
+      event.preventDefault();
+      const text = document.getElementById("comment-text").value.trim();
+      if (!text || !currentEpisodeId) return;
+      const newComment = {
+        user: "UsuarioGit",
+        avatar: "https://avatars.githubusercontent.com/u/583231?v=4",
+        date: new Date().toLocaleDateString(),
+        text
+      };
+      if (!commentsMap.has(currentEpisodeId)) {
+        commentsMap.set(currentEpisodeId, []);
+      }
+      commentsMap.get(currentEpisodeId).push(newComment);
+      document.getElementById("comment-text").value = "";
+      renderComments();
+    }
+
+    function renderComments() {
+      const list = document.getElementById("comment-list");
+      const count = document.getElementById("comment-count");
+      list.innerHTML = "";
+      const episodeComments = commentsMap.get(currentEpisodeId) || [];
+      episodeComments.forEach(c => {
+        const div = document.createElement("div");
+        div.className = "comment";
+        div.innerHTML = `
+          <img src="${c.avatar}" alt="avatar" />
+          <span class="comment-user">${c.user}</span>
+          <span class="comment-date">${c.date}</span>
+          <div>${c.text}</div>
+        `;
+        list.appendChild(div);
+      });
+      count.textContent = episodeComments.length;
+    }
+  </script>
+</body>
+</html>
